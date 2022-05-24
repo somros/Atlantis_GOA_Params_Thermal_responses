@@ -85,8 +85,8 @@ fit_at_tcorr <- function(par, dat){
 }
 
 start_tcorr <- c(log(0.851), log(1.066), log(1), log(3), log(1000))
-tcorr_fit <- optim(start_tcorr, gg_fun, dat = this_data)
-tcorr_fit$par
+tcorr_fit <- optim(start_tcorr, fit_at_tcorr, dat = this_data)
+exp(tcorr_fit$par)
 
 fit_A <- exp(tcorr_fit$par[1])
 fit_B <- exp(tcorr_fit$par[2])
@@ -268,4 +268,155 @@ tcorr_frame_fit_long %>%
   geom_line(size = 2)+
   scale_color_manual(values = c('red','green','blue'))+
   theme_bw()
+
+# Global fixed ------------------------------------------------------------
+
+# set values of the global parameters to the defaults
+# fit the rest species by species
+
+set.seed(999)
+
+Tamb <- seq(0,30,0.1) # temperature
+
+fit_at_tcorr <- function(par, dat, Tc0){
+  
+  coeffA <- exp(par[1])
+  coeffB <- 1.066 # global
+  coeffC <- 1 # global
+  coeffD <- 3 # global
+  corr <- exp(par[2])
+  
+  #data
+  Tamb <- dat$Tamb
+  Tcorr <- dat$Tcorr
+  
+  #gg
+  Tcorr_at <- log(2) * coeffA * coeffB^Tamb * exp(-coeffC * (abs(Tamb - Tc0)^coeffD) / corr)
+  
+  obj_fun <- sum((log1p(Tcorr)-log1p(Tcorr_at))^2)
+  obj_fun
+}
+
+start_tcorr <- c(log(0.851), log(100))
+
+# make data
+this_data_POL <- tcorr_frame %>% select(Tamb, Pollock) %>% filter(!is.nan(Pollock)) %>% set_names(c('Tamb','Tcorr'))
+this_data_COD <- tcorr_frame %>% select(Tamb, Cod) %>% filter(!is.nan(Cod)) %>% set_names(c('Tamb','Tcorr'))
+this_data_ATF <- tcorr_frame %>% select(Tamb, ATF) %>% filter(!is.nan(ATF)) %>% set_names(c('Tamb','Tcorr'))
+
+# fit
+tcorr_fit_POL <- optim(start_tcorr, fit_at_tcorr, dat = this_data_POL, Tc0 = 10)
+tcorr_fit_COD <- optim(start_tcorr, fit_at_tcorr, dat = this_data_COD, Tc0 = 13.7)
+tcorr_fit_ATF <- optim(start_tcorr, fit_at_tcorr, dat = this_data_ATF, Tc0 = 20.512)
+
+#pol
+fit_A_POL <- exp(tcorr_fit_POL$par[1])
+fit_corr_POL <- exp(tcorr_fit_POL$par[2])
+#cod
+fit_A_COD <- exp(tcorr_fit_COD$par[1])
+fit_corr_COD <- exp(tcorr_fit_COD$par[2])
+#atf
+fit_A_ATF <- exp(tcorr_fit_ATF$par[1])
+fit_corr_ATF <- exp(tcorr_fit_ATF$par[2])
+
+# make predictions and see how they align
+T_test <- seq(0,30,0.1)
+
+fit_tcorr_POL <- log(2) * fit_A_POL * 1.066^T_test * exp(-1 * (abs(T_test - 10)^3) / fit_corr_POL)
+fit_tcorr_COD <- log(2) * fit_A_COD * 1.066^T_test * exp(-1 * (abs(T_test - 13.7)^3) / fit_corr_COD)
+fit_tcorr_ATF <- log(2) * fit_A_ATF * 1.066^T_test * exp(-1 * (abs(T_test - 20.512)^3) / fit_corr_ATF)
+
+fit_tcorr <- data.frame(T_test, fit_tcorr_POL, fit_tcorr_COD, fit_tcorr_ATF) %>%
+  set_names(c('Tamb', 'Pollock', 'Cod', 'ATF')) %>%
+  pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr')
+
+fit_tcorr %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
+  geom_line(size = 2)+
+  scale_color_manual(values = c('red','green','blue'))+
+  theme_bw()
+
+# nope. Probably too constrained now.
+
+
+# Fix C and D -------------------------------------------------------------------
+
+# estimate species-specific together and B
+
+fit_at_tcorr <- function(par, dat){
+  
+  # dat <- tcorr_frame
+  # par <- start_tcorr
+  
+  # parameters
+  coeffA <- c(exp(par[1]), exp(par[2]), exp(par[3]))
+  coeffB <- exp(par[4]) # global
+  Tc0 <- c(10, 13.7, 20.512) # optimum T - known (from Holsman and Aydin (2015))
+  coeffC <- 1 # global
+  coeffD <- 3 # global
+  corr <- c(exp(par[5]), exp(par[6]), exp(par[7])) # correction factor
+  
+  species <- colnames(dat)[-1]
+  
+  obj_vec <- rep(0, length(species))
+  
+  for(i in 1:length(species)){
+    
+    #data - Tcorr from Holsman and Aydin (2015)
+    this_dat <- dat %>% select(Tamb, species[i]) %>% drop_na() %>% set_names(c('Tamb','Tcorr'))
+    Tamb <- this_dat$Tamb
+    Tcorr <- this_dat$Tcorr
+    
+    #calculate Tcorr vectors from q10method 1
+    Tcorr_at <- log(2) * coeffA[i] * coeffB^Tamb * exp(-coeffC * (abs(Tamb - Tc0[i])^coeffD) / corr[i])
+    
+    #likelihood - most likely wrong
+    obj_fun <- sum((log1p(Tcorr)-log1p(Tcorr_at))^2)
+
+    obj_vec[i] <- obj_fun
+  }
+  
+  obj_all <- sum(obj_vec)
+  
+  return(obj_all)
+}
+
+# start from initial values from GG's function, equal for all 3
+start_tcorr <- c(rep(log(0.851), 3), log(1.066), rep(log(1000), 3))
+start_tcorr <- tcorr_fit$par
+tcorr_fit <- optim(start_tcorr, fit_at_tcorr, dat = tcorr_frame)
+exp(tcorr_fit$par)
+
+
+fit_A_POL <- exp(tcorr_fit$par[1])
+fit_A_COD <- exp(tcorr_fit$par[2])
+fit_A_ATF <- exp(tcorr_fit$par[3])
+
+fit_B <- exp(tcorr_fit$par[4])
+
+fit_corr_POL <- exp(tcorr_fit$par[5])
+fit_corr_COD <- exp(tcorr_fit$par[6])
+fit_corr_ATF <- exp(tcorr_fit$par[7])
+
+# make predictions and see how they align
+Temp <- seq(0,30,0.1)
+
+fit_tcorr_POL <- log(2) * fit_A_POL * fit_B^Temp * exp(-1 * (abs(Temp - 10)^3) / fit_corr_POL)
+fit_tcorr_COD <- log(2) * fit_A_COD * fit_B^Temp * exp(-1 * (abs(Temp - 13.7)^3) / fit_corr_COD)
+fit_tcorr_ATF <- log(2) * fit_A_ATF * fit_B^Temp * exp(-1 * (abs(Temp - 20.512)^3) / fit_corr_ATF)
+
+tcorr_frame_fit <- data.frame('Tamb' = Temp, 
+                              'Pollock_fit' = fit_tcorr_POL,
+                              'Cod_fit' = fit_tcorr_COD,
+                              'ATF_fit' = fit_A_ATF)
+
+tcorr_frame_fit_long <- tcorr_frame_fit %>%
+  pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr from fit')
+
+tcorr_frame_fit_long %>% 
+  ggplot(aes(x = Tamb, y = `Tcorr from fit`, color = Species))+
+  geom_line(size = 2)+
+  scale_color_manual(values = c('red','green','blue'))+
+  theme_bw()
+
+# also no
 
