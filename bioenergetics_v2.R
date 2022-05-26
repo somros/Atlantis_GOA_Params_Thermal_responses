@@ -193,7 +193,15 @@ fit_tcorr %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   scale_color_manual(values = c('red','green','blue','black'))+
   theme_bw()
 
-c(fit_A_POL, fit_corr_POL, fit_A_COD, fit_corr_COD, fit_A_ATF, fit_corr_ATF, fit_A_HAL, fit_corr_HAL, 0.95, 7, 1.2)
+write.csv(data.frame('Parameter' = c('temp_coefftA_POL','q10_correction_POL',
+  'temp_coefftA_COD','q10_correction_COD',
+  'temp_coefftA_ATF','q10_correction_ATF',
+  'temp_coefftA_HAL','q10_correction_HAL',
+  'temp_coeffB',
+  'temp_coeffC',
+  'temp_exp'),
+  'Value' = c(fit_A_POL, fit_corr_POL, fit_A_COD, fit_corr_COD, fit_A_ATF, fit_corr_ATF, fit_A_HAL, fit_corr_HAL, 0.95, 7, 1.2)),
+  file = 'params_q10.csv', row.names = F)
 
 # Merge with thermal maxima ----------------------------------------------
 
