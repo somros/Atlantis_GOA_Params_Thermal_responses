@@ -50,3 +50,18 @@ tt <- aquamaps %>%
   select(Name, min, max) %>%
   set_names(c('Name','min_aquamaps','max_aquamaps')) %>%
   left_join((temps_frame %>% filter(fg %in% shared) %>% select(fg, min, max) %>% set_names(c('Name','min_race','max_race'))), by = 'Name')
+
+# reshape to view
+tt %>%
+  pivot_longer(-Name, names_to = 'Variable', values_to = 'Value') %>%
+  mutate(Temp = substr(Variable, 1, 3),
+         Source = substr(Variable, (nchar(Variable)-3), (nchar(Variable)))) %>%
+  select(Name, Temp, Source, Value) %>%
+  pivot_wider(id_cols = c(Name, Source), names_from = Temp, values_from = Value) %>%
+  ggplot(aes(x = Name, group = Source))+
+  geom_linerange(aes(color = Source, ymin = min, ymax = max), position = position_dodge(width=0.9), size = 1)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# temperature windows from bottom trwl data are narrower than from Aquamaps, and often have a higher median (mostly for surface water temps)
+
