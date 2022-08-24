@@ -43,11 +43,14 @@ tcorr_frame_long <- tcorr_frame %>%
   pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr')
 
 
-tcorr_frame_long %>%
+p <- tcorr_frame_long %>%
   ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
-  scale_color_manual(values = c('red','green','blue','black'))+
-  theme_bw()
+  scale_color_manual(values = c('orange','blue','grey','black'))+
+  theme_bw()+
+  labs(x = 'Temperature (C)', 'Tcorr')
+
+p
 
 
 # Atlantis Q10method = 1 --------------------------------------------------
@@ -190,8 +193,9 @@ fit_tcorr <- data.frame(T_test, fit_tcorr_POL, fit_tcorr_COD, fit_tcorr_ATF, fit
 
 fit_tcorr %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
-  scale_color_manual(values = c('red','green','blue','black'))+
-  theme_bw()
+  scale_color_manual(values = c('orange','blue','grey','black'))+
+  theme_bw()+
+  labs(x = 'Temperature (C)', 'Tcorr')
 
 write.csv(data.frame('Parameter' = c('temp_coefftA_POL','q10_correction_POL',
   'temp_coefftA_COD','q10_correction_COD',
@@ -211,12 +215,48 @@ write.csv(data.frame('Parameter' = c('temp_coefftA_POL','q10_correction_POL',
 
 # Tcm is the temperature after which consumption ceased in the lab setting from Holsman and Aydin (2015)
 
-fit_tcorr <- fit_tcorr %>%
+fit_tcorr1 <- fit_tcorr %>%
   rowwise() %>%
   mutate(Tcm = ifelse(Species == 'Pollock', 15, ifelse(Species == 'Cod', 21, ifelse(Species == 'ATF', 26, 18)))) %>%
   mutate(Tcorr = ifelse(Tamb <= Tcm, Tcorr, 0))
 
-fit_tcorr %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
+fit_tcorr1 %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
   scale_color_manual(values = c('red','green','blue','black'))+
   theme_bw()
+
+# Plot for methods section ------------------------------------------------
+# make a plot for the methods
+t <- tcorr_frame_long %>% mutate(Source = 'Wisconsin')
+t1 <- fit_tcorr %>% mutate(Source = 'Atlantis')
+t2 <- rbind(t,t1)
+
+t2$Source <- factor(t2$Source, levels = c('Wisconsin','Atlantis'))
+
+p <- t2 %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
+  geom_line(size = 2)+
+  scale_color_manual(values = c('orange','blue','grey','black'))+
+  theme_bw()+
+  labs(x = 'Temperature (C)', y = expression(T[corr]))+ # chage this to a damn subscript
+  facet_wrap(~Source)
+p
+
+# Merge q10 curves with thermal windows -----------------------------------
+niches <- read.csv('thermal_niches_aquamaps_0_100_percentiles.csv')
+niches <- niches %>%
+  filter(Name %in% c('Pollock', 'Cod', 'Arrowtooth_flounder', 'Halibut')) %>%
+  select(Name, min, max)
+
+niches$Name <- gsub('Arrowtooth_flounder', 'ATF', niches$Name)
+
+fit_tcorr2 <- fit_tcorr %>%
+  left_join(niches, by = c('Species'='Name')) %>%
+  rowwise() %>%
+  mutate(Tcorr1 = ifelse(Tamb >= min & Tamb <= max, Tcorr, 0)) %>%
+  ungroup()
+
+fit_tcorr2 %>% ggplot(aes(x = Tamb, y = Tcorr1, color = Species))+
+  geom_line(size = 2)+
+  scale_color_manual(values = c('orange','blue','grey','black'))+
+  theme_bw()+
+  labs(x = 'Temperature (C)', 'Tcorr')
