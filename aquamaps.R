@@ -10,7 +10,7 @@
 library(data.table)
 library(tidyverse)
 
-niche_files <- list.files('data/', full.names = T)
+niche_files <- list.files('data/aquamaps', full.names = T)
 key <- read.csv('species_list.csv')
 atlantis_groups <- read.csv('GOA_Groups.csv')
 flagdem <- read.csv('flagdem.csv')
@@ -74,7 +74,8 @@ all_niches1 <- all_niches_fg %>%
   # select(-bound,-percentile) %>%
   pivot_wider(names_from = bound, values_from = t) %>%
   rowwise() %>%
-  mutate(opt = (min+max)/2)
+  mutate(opt = (min+max)/2) %>%
+  ungroup()
 
 # some renaming
 all_niches1$location <- gsub('b','Bottom',all_niches1$location)
@@ -91,18 +92,34 @@ ggplot(all_niches1, aes(x=location, y=opt, color=percentile))+
   facet_wrap(~Name, ncol=10)
 
 # here we decide for each fg whether we use bottom or surface temperature as limiting
-pull_temp <- function(fg,flagdem,is_minimum){
-  if(flagdem>0){
-    if(isTRUE(is_minimum)){
-      this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='5 and 95 percentiles') %>% pull(min)
+pull_temp <- function(fg,flagdem,is_minimum,fullrange){
+  if(isTRUE(fullrange)){
+    if(flagdem>0){
+      if(isTRUE(is_minimum)){
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='Full range') %>% pull(min)
+      } else {
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='Full range') %>% pull(max)
+      }
     } else {
-      this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='5 and 95 percentiles') %>% pull(max)
+      if(isTRUE(is_minimum)){
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='Full range') %>% pull(min)
+      } else {
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='Full range') %>% pull(max)
+      }
     }
   } else {
-    if(isTRUE(is_minimum)){
-      this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='5 and 95 percentiles') %>% pull(min)
+    if(flagdem>0){
+      if(isTRUE(is_minimum)){
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='5 and 95 percentiles') %>% pull(min)
+      } else {
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Bottom',percentile=='5 and 95 percentiles') %>% pull(max)
+      }
     } else {
-      this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='5 and 95 percentiles') %>% pull(max)
+      if(isTRUE(is_minimum)){
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='5 and 95 percentiles') %>% pull(min)
+      } else {
+        this_bound <- all_niches1 %>% filter(Code==fg,location=='Surface',percentile=='5 and 95 percentiles') %>% pull(max)
+      }
     }
   }
   return(this_bound)
@@ -110,26 +127,49 @@ pull_temp <- function(fg,flagdem,is_minimum){
 
 niches_final <- all_niches1 %>% select(Code, Name) %>% distinct() %>%
   left_join(flagdem, by = c('Code'='atlantis_fg')) %>%
-  mutate(min = purrr::pmap(list(Code,flagdemXXX,T),pull_temp),
-         max = purrr::pmap(list(Code,flagdemXXX,F),pull_temp)) %>%
+  mutate(min = purrr::pmap(list(Code,flagdemXXX,T,T),pull_temp),
+         max = purrr::pmap(list(Code,flagdemXXX,F,T),pull_temp)) %>%
   unnest(cols = c(min,max))
 
 # view 
-niches_final %>%
-  mutate(opt=(min+max)/2) %>%
+p <- niches_final %>%
+  mutate(opt=(min+max)/2) %>% # this may not be true
+  rowwise() %>%
+  mutate(Type = ifelse(flagdemXXX == 1, 'Demersal', 'Pelagic')) %>%
+  ungroup() %>%
   ggplot(aes(x=Name, y=opt))+
-  geom_point()+
-  geom_linerange(aes(min=min, max=max))+
+  geom_point(aes(color = factor(Type)))+
+  geom_linerange(aes(min=min, max=max, color = factor(Type)))+
+  scale_color_manual(values = c('orange','blue'))+
   scale_y_continuous(breaks = seq(0,30,2), labels = seq(0,30,2))+
   theme_bw()+
-  theme(axis.text.x = element_text(angle = 50, vjust = 1, hjust=1))+
-  labs(x='',y='Temperature')
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1), text = element_text(size = 14))+
+  labs(x='', y='Temperature (C)', color = '')
+p
+
+p <- niches_final %>%
+  mutate(opt=(min+max)/2) %>%
+  rowwise() %>%
+  mutate(Type = ifelse(flagdemXXX == 1, 'Demersal', 'Pelagic')) %>%
+  ungroup() %>%
+  ggplot(aes(x=Name, y=opt))+
+  #geom_point(aes(color = factor(Type)))+
+  geom_linerange(aes(min=min, max=max, color = factor(Type)), size = 1.5)+
+  scale_color_manual(values = c('orange','blue'))+
+  scale_y_continuous(breaks = seq(0,30,2), labels = seq(0,30,2))+
+  coord_flip()+
+  theme_bw()+
+  theme(text = element_text(size = 14))+
+  labs(x='', y='Temperature (C)', color = '')
+p
+
+ggsave('niches_0_100.png', p, width = 8, height = 8)
 
 # write out
 
 niches_final %>% 
   left_join((atlantis_groups %>% select(Index, Code)), by = 'Code') %>%
   arrange (Index) %>%
-  write.csv('thermal_niches_aquamaps_5_95_percentiles.csv', row.names = F)
+  write.csv('thermal_niches_aquamaps_0_100_percentiles.csv', row.names = F)
 
   
