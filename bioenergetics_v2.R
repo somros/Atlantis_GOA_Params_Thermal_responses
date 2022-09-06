@@ -43,14 +43,15 @@ tcorr_frame_long <- tcorr_frame %>%
   pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr')
 
 
-p <- tcorr_frame_long %>%
+p1 <- tcorr_frame_long %>%
   ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
   scale_color_manual(values = c('orange','blue','grey','black'))+
   theme_bw()+
   labs(x = 'Temperature (C)', 'Tcorr')
 
-p
+p1
+ggsave('CEATTLE.png', p1, width = 6, height = 4)
 
 
 # Atlantis Q10method = 1 --------------------------------------------------
@@ -233,13 +234,16 @@ t2 <- rbind(t,t1)
 
 t2$Source <- factor(t2$Source, levels = c('Wisconsin','Atlantis'))
 
-p <- t2 %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
+p2 <- t2 %>% ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
   scale_color_manual(values = c('orange','blue','grey','black'))+
   theme_bw()+
   labs(x = 'Temperature (C)', y = expression(T[corr]))+ # chage this to a damn subscript
   facet_wrap(~Source)
-p
+p2
+
+ggsave('fit.png', p2, width = 8, height = 4)
+
 
 # Merge q10 curves with thermal windows -----------------------------------
 niches <- read.csv('thermal_niches_aquamaps_0_100_percentiles.csv')
@@ -255,8 +259,11 @@ fit_tcorr2 <- fit_tcorr %>%
   mutate(Tcorr1 = ifelse(Tamb >= min & Tamb <= max, Tcorr, 0)) %>%
   ungroup()
 
-fit_tcorr2 %>% ggplot(aes(x = Tamb, y = Tcorr1, color = Species))+
+p3 <- fit_tcorr2 %>% ggplot(aes(x = Tamb, y = Tcorr1, color = Species))+
   geom_line(size = 2)+
   scale_color_manual(values = c('orange','blue','grey','black'))+
   theme_bw()+
   labs(x = 'Temperature (C)', 'Tcorr')
+p3
+
+ggsave('window_and_bioenergetics.png', p3, width = 6, height = 4)
