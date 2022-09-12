@@ -267,3 +267,20 @@ p3 <- fit_tcorr2 %>% ggplot(aes(x = Tamb, y = Tcorr1, color = Species))+
 p3
 
 ggsave('window_and_bioenergetics.png', p3, width = 6, height = 4)
+
+# add a plot with the curves from CEATTLE and the thermal niches
+
+tcorr_frame_long2 <- tcorr_frame_long %>%
+  left_join(niches, by = c('Species'='Name')) %>%
+  rowwise() %>%
+  mutate(Tcorr1 = ifelse(Tamb >= min & Tamb <= max, Tcorr, 0)) %>%
+  ungroup()
+
+p4 <- tcorr_frame_long2 %>% ggplot(aes(x = Tamb, y = Tcorr1, color = Species))+
+  geom_line(size = 2)+
+  scale_color_manual(values = c('orange','blue','grey','black'))+
+  theme_bw()+
+  labs(x = 'Temperature (C)', 'Tcorr')
+p4
+
+ggsave('window_and_bioenergetics_CEATTLE.png', p4, width = 6, height = 4)
