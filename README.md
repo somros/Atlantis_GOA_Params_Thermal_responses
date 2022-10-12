@@ -2,7 +2,7 @@
 
 This code deals with the effects of temperature on Atlantis GOA biology.  
 
-Atlantis has two ways to capture thermal effects ([Audzijonyte et al. 2019](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13272):  
+Atlantis has two ways to capture thermal effects ([Audzijonyte et al. 2019](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13272)):  
 1. Thermal tolerance niches that restrict spatial distributions.
 2. Bioenergetic responses of metabolic processes.  
 
