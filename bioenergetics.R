@@ -1,12 +1,14 @@
 # Bioenergetics from CEATTLE
 library(tidyverse)
 
-# from: Holsman, K. K., & Aydin, K. (2015). Comparative methods for evaluating climate change impacts on the foraging ecology of Alaskan groundfish. Marine Ecology Progress Series, 521, 217–235. https://doi.org/10.3354/meps11102
+# Pollock, Cod, and ATF from: Holsman, K. K., & Aydin, K. (2015). Comparative methods for evaluating climate change impacts on the foraging ecology of Alaskan groundfish. Marine Ecology Progress Series, 521, 217–235. https://doi.org/10.3354/meps11102
+# Halibut from: Holsman, KK, Aydin, K, Sullivan, J, Hurst, T, Kruse, GH. Climate effects and bottom-up controls on growth and size-at-age of Pacific halibut (Hippoglossus stenolepis) in Alaska (USA). Fish Oceanogr. 2019; 28: 345– 358. https://doi.org/10.1111/fog.12416
 
 dat <- data.frame('Par' = c('Cq', 'Tc0', 'Tcm'),
                   'Pollock' = c(2.6, 10, 15),
                   'Cod' = c(2.41, 13.7, 21),
-                  'ATF' = c(2.497, 20.512, 26))
+                  'ATF' = c(2.497, 20.512, 26),
+                  'Halibut' = c(3.084, 12.97, 18))
 
 # TC0 is the temperature where laboratory consumption rates are highest, TCM is the maximum water
 # temperature above which consumption ceases and CQ approximates the Q10 or the rate at which 
@@ -32,7 +34,8 @@ make_curve <- function(species, dat, Tamb){
 tcorr_frame <- data.frame('Tamb' = seq(0, 30, 0.1)) %>%
   mutate(Pollock = make_curve('Pollock', dat, Tamb),
          Cod = make_curve('Cod', dat, Tamb),
-         ATF = make_curve('ATF', dat, Tamb)) 
+         ATF = make_curve('ATF', dat, Tamb),
+         Halibut = make_curve('Halibut', dat, Tamb)) 
 
 tcorr_frame_long <- tcorr_frame %>%
   pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr')
@@ -41,7 +44,7 @@ tcorr_frame_long <- tcorr_frame %>%
 tcorr_frame_long %>%
   ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
-  scale_color_manual(values = c('red','green','blue'))+
+  scale_color_manual(values = c('red','green','blue','black'))+
   theme_bw()
 
 
@@ -63,12 +66,14 @@ tcorr_at <- log(2) * coeffA * coeffB^Tamb * exp(-coeffC * (abs(Tamb - Tc0)^coeff
 
 # Fit model for single species --------------------------------------------
 
-this_data <- tcorr_frame %>% select(Tamb, ATF) %>% filter(!is.nan(ATF)) %>% set_names(c('Tamb','Tcorr'))
+set.seed(999)
+
+this_data <- tcorr_frame %>% select(Tamb, Cod) %>% filter(!is.nan(Cod)) %>% set_names(c('Tamb','Tcorr'))
 
 fit_at_tcorr <- function(par, dat){
   coeffA <- exp(par[1])
   coeffB <- exp(par[2]) # global
-  Tc0 <- 20.512 # optimum for each species
+  Tc0 <- 13.7 # optimum for each species
   coeffC <- exp(par[3]) # global
   coeffD <- exp(par[4]) # global
   corr <- exp(par[5])
@@ -86,7 +91,7 @@ fit_at_tcorr <- function(par, dat){
 }
 
 start_tcorr <- c(log(0.851), log(1.066), log(1), log(3), log(1000))
-tcorr_fit <- optim(tcorr_fit$par, fit_at_tcorr, dat = this_data)
+tcorr_fit <- optim(start_tcorr, fit_at_tcorr, dat = this_data)
 exp(tcorr_fit$par)
 
 fit_A <- exp(tcorr_fit$par[1])
@@ -97,7 +102,7 @@ fit_corr <- exp(tcorr_fit$par[5])
 
 # make predictions and see how they align
 T_test <- seq(0,30,0.1)
-fit_tcorr <- log(2) * fit_A * fit_B^T_test * exp(-fit_C * (abs(T_test - 20.512)^fit_D) / fit_corr)
+fit_tcorr <- log(2) * fit_A * fit_B^T_test * exp(-fit_C * (abs(T_test - 12.97)^fit_D) / fit_corr)
 
 plot(T_test, fit_tcorr, 'l') # not awesome. Sensitive to some of the initial values (functional response is very sensititve to parameter changes)
 

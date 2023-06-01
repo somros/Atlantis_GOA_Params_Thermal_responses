@@ -42,11 +42,10 @@ tcorr_frame <- data.frame('Tamb' = seq(0, 30, 0.1)) %>%
 tcorr_frame_long <- tcorr_frame %>%
   pivot_longer(-Tamb, names_to = 'Species', values_to = 'Tcorr')
 
-
 p1 <- tcorr_frame_long %>%
   ggplot(aes(x = Tamb, y = Tcorr, color = Species))+
   geom_line(size = 2)+
-  scale_color_manual(values = c('orange','blue','grey','black'))+
+  scale_color_viridis_d(begin = 0.1, end = 0.9)+
   theme_bw()+
   labs(x = 'Temperature (C)', 'Tcorr')
 
