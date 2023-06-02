@@ -32,7 +32,7 @@ mean_ratio <- mean(ceattle$ratio) # on average Tc0 = 0.7*Tcm for CEATTLE species
 
 # start from dat100
 bioen_pars <- dat100 %>%
-  mutate(Cq = 2,
+  mutate(Cq = 2.36,
          Tcm = max,
          Tc0 = max * 0.7) %>%
   select(Name, Cq, Tc0, Tcm)
