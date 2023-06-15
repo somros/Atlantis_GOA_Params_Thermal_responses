@@ -98,16 +98,33 @@ tcorr_frame <- tcorr_frame %>% left_join(guilds, by = c('Name'='fg'))
 # add code
 tcorr_frame <- tcorr_frame %>% left_join(atlantis_groups %>% select(Name, Code), by = 'Name')
 
-p1 <- tcorr_frame %>%
+# make faceted plot
+p_dome <- tcorr_frame %>%
   filter(Name %in% fish_grps) %>%
   filter(Name != 'Pollock', Name != 'Cod', Name != 'Arrowtooth_flounder', Name != 'Halibut') %>%
-  ggplot(aes(x = Tamb, y = Tcorr, color = Name))+
-  geom_line(linewidth = 2)+
-  #scale_color_viridis_d(begin = 0.1, end = 0.9)+
-  theme_bw()+
-  labs(x = 'Temperature (C)', 'Tcorr')
+  mutate(Guild = factor(Guild)) %>%
+  split(.$Guild) %>%
+  purrr::map(~ ggplot()+
+               geom_line(data = ., aes(x = Tamb, y = Tcorr, color = Name), linewidth = 2)+
+               scale_color_viridis_d(begin = 0.1, end = 0.9)+
+               scale_x_continuous(limits = c(0,30))+
+               theme_bw()+
+               labs(x = 'Temperature (C)', 'Tcorr')+
+               facet_wrap(~Guild)) %>%
+  cowplot::plot_grid(plotlist = ., ncol = 2)
+p_dome
 
-p1
+ggsave('all_domed.png', p_dome,width = 12, height=8, dpi = 600)  
+
+# p1 <- tcorr_frame %>%
+#   filter(Name %in% fish_grps) %>%
+#   filter(Name != 'Pollock', Name != 'Cod', Name != 'Arrowtooth_flounder', Name != 'Halibut') %>%
+#   ggplot(aes(x = Tamb, y = Tcorr, color = Name))+
+#   geom_line(linewidth = 2)+
+#   #scale_color_viridis_d(begin = 0.1, end = 0.9)+
+#   theme_bw()+
+#   labs(x = 'Temperature (C)', 'Tcorr')
+# p1
 
 # save a table with the new values for biol_prm
 # keep the defaults for everything tat is not a fish - these will still use method 0 anyway
